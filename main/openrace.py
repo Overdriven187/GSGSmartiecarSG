@@ -3,10 +3,11 @@ from Tools import Led as L
 from libs import DCMotor as DC
 from libs import steering as ST
 from libs import gyro as GY
+from libs import ultrasonic as US
+import RPI.GPIO as GPIO
 # Global variables and simulation parameters
 prog_start_time = time.time()
 
-DC.stopMotor()
 DrivingDirection = 'U'
 SlowSpeed = 50
 CurveSpeed = 100
@@ -45,51 +46,24 @@ def delay(ms):
 def millis():
     return int((time.time() - prog_start_time) * 1000)
 
-# Dummy implementation of the ultrasonic sensor functions
-def SpaceUltraSonicFront():
-    global sensor_front
-    # Simulate sensor reading decreasing gradually if above threshold 140
-    if sensor_front > 140:
-        sensor_front -= 1
-    return sensor_front
 
-def SpaceUltraSonicLeft():
-    global sensor_left
-    # Simulate sensor reading decreasing gradually if above 60
-    if sensor_left > 60:
-        sensor_left -= 1
-    return sensor_left
-
-def SpaceUltraSonicRight():
-    global sensor_right
-    # Simulate sensor reading decreasing gradually if above 60
-    if sensor_right > 60:
-        sensor_right -= 1
-    return sensor_right
-
-# Dummy digitalRead implementation for the button
 def digitalRead(pin):
-    # For simulation, always return HIGH (button pressed)
-    return HIGH
-
-
-# ProgramStopUsingGyro()
-# stops the car using the gyrovalues saved from beginning
+    return GPIO.input(pin)
 
 def ProgramStopUsingGyro():
     global Distance_Front, start_time
-    DrivingTime = 0  # driving time
+    #DrivingTime = 0  # driving time
     temporaryTime = 0
 
-    runMotor(SlowSpeed)  # slow down
+    DC.runMotor(SlowSpeed)  # slow down
     # slight countersteering to compensate for overshooting
     if DrivingDirection == 'R':
-        left(10)
+        ST.left(10)
     else:
-        right(10)
+        ST.right(10)
 
     delay(400)
-    center()
+    ST.center()
 
     # Go straight for at least x msec
     Gyro_steer_straight()
@@ -99,15 +73,15 @@ def ProgramStopUsingGyro():
 
     # drive straight to finish and stop
     global Distance_Front
-    Distance_Front = SpaceUltraSonicFront()
+    Distance_Front = US.SpaceUltraSonicFront()
     while Distance_Front > 140:
         Gyro_steer_straight()
-        Distance_Front = SpaceUltraSonicFront()
+        Distance_Front = US.SpaceUltraSonicFront()
 
-    stopMotor()
-    runMotor_R(SlowSpeed)
+    DC.stopMotor()
+    DC.runMotor_R(SlowSpeed)
     delay(1500)
-    stopMotor()
+    DC.stopMotor()
 
     # save current time in milliseconds
     DrivingTime = millis() - start_time
@@ -125,22 +99,22 @@ def StartNarrow_L():
     angle = 0.0
     TargetDirection = 360.0
     Speed = SlowSpeed
-    right(30)
+    ST.right(30)
     delay(500)
-    center()
+    ST.center()
     delay(500)
-    angle = IMU_getAngle()
+    angle = GY.IMU_getAngle()
     #lcd.setCursor(0, 0)
-    left(30)
+    ST.left(30)
     while angle > TargetDirection + correction_Left:
-        angle = IMU_getAngle()
+        angle = GY.IMU_getAngle()
         Speed = Speed + 5
         if Speed > CurveSpeed:
             Speed = CurveSpeed
-        runMotor(Speed)
+        DC.runMotor(Speed)
         delay(50)
-    center()
-    runMotor(SlowSpeed)
+    ST.center()
+    DC.runMotor(SlowSpeed)
  
 
 # StartNarrow_R()
@@ -151,22 +125,22 @@ def StartNarrow_R():
     angle = 0.0
     TargetDirection = 0.0
     Speed = SlowSpeed  # Initialize Speed
-    left(30)
+    ST.left(30)
     delay(500)
-    center()
+    ST.center()
     delay(500)
-    angle = IMU_getAngle()
+    angle = GY.IMU_getAngle()
     #lcd.setCursor(0, 0)
-    right(30)
+    ST.right(30)
     while angle < TargetDirection - correction_Right:
-        angle = IMU_getAngle()
+        angle = GY.IMU_getAngle()
         Speed = Speed + 5
         if Speed > CurveSpeed:
             Speed = CurveSpeed
-        runMotor(Speed)
+        DC.runMotor(Speed)
         delay(50)
-    center()
-    runMotor(SlowSpeed)
+    ST.center()
+    DC.runMotor(SlowSpeed)
  
 
 # alignCenter()
@@ -182,9 +156,9 @@ def alignCenter():
 
     if Steering < 0:
         Steering = Steering * (-1)
-        right(Steering)
+        ST.right(Steering)
     else:
-        left(Steering)
+        ST.left(Steering)
 
     delay(20)
  
@@ -194,7 +168,7 @@ def alignCenter():
 
 def alignLeft():
     global Distance_Left
-    Distance_Left = SpaceUltraSonicLeft()
+    Distance_Left = US.SpaceUltraSonicLeft()
     Steering = int((Distance_Left - Walldistance) * 0.9)
     if Steering > 30.0:
         Steering = 30
@@ -203,9 +177,9 @@ def alignLeft():
 
     if Steering < 0:
         Steering = Steering * (-1)
-        right(Steering)
+        ST.right(Steering)
     else:
-        left(Steering)
+        ST.left(Steering)
 
     delay(20)
  
@@ -215,7 +189,7 @@ def alignLeft():
 
 def alignRight():
     global Distance_Right
-    Distance_Right = SpaceUltraSonicRight()
+    Distance_Right = US.SpaceUltraSonicRight()
     Steering = int((Walldistance - Distance_Right) * 0.9)
     if Steering > 30.0:
         Steering = 30
@@ -224,9 +198,9 @@ def alignRight():
 
     if Steering < 0:
         Steering = Steering * (-1)
-        right(Steering)
+        ST.right(Steering)
     else:
-        left(Steering)
+        ST.left(Steering)
 
     delay(20)
  
@@ -235,7 +209,7 @@ def alignRight():
 # uses the gyro to orient itself straight to the track
 ##################################
 def Gyro_steer_straight():
-    angle = IMU_getAngle()
+    angle = GY.IMU_getAngle()
     Steering = int((angle - StraightAngle) * 0.8)  # 0.8 = wiggle factor
     if Steering > 15.0:
         Steering = 15
@@ -244,9 +218,9 @@ def Gyro_steer_straight():
 
     if Steering < 0:
         Steering = Steering * (-1)
-        right(Steering)
+        ST.right(Steering)
     else:
-        left(Steering)
+        ST.left(Steering)
 
     # delay(20)
  
@@ -257,27 +231,27 @@ def Gyro_steer_straight():
 def Curve_L():
     global corners, StraightAngle, angle, LastCurveTime, Distance_Left, sensor_left, current_angle
     Speed = CurveSpeed
-    left(40)
+    ST.left(40)
     #lcd.setRGB(0, 0, 255)
     TargetDirection = StraightAngle - 90.0
-    angle = IMU_getAngle()
+    angle = GY.IMU_getAngle()
     StraightAngle = TargetDirection
-    runMotor(SlowSpeed)
+    DC.runMotor(SlowSpeed)
     while angle > TargetDirection + correction_Left:
-        angle = IMU_getAngle()
+        angle = GY.IMU_getAngle()
         Speed = Speed + 5
         if Speed > CurveSpeed:
             Speed = CurveSpeed
-        runMotor(Speed)
+        DC.runMotor(Speed)
         delay(50)
     corners = corners + 1
     StraightAngle = TargetDirection
-    center()
-    runMotor(NormalSpeed)
-    Distance_Left = SpaceUltraSonicLeft()
+    ST.center()
+    DC.runMotor(NormalSpeed)
+    Distance_Left = US.SpaceUltraSonicLeft()
     # try to find the inside wall again
     while Distance_Left > 60:
-        Distance_Left = SpaceUltraSonicLeft()
+        Distance_Left = US.SpaceUltraSonicLeft()
         Gyro_steer_straight()
     #lcd.setRGB(0, 255, 0)
     LastCurveTime = millis()
@@ -289,28 +263,28 @@ def Curve_L():
 def Curve_R():
     global corners, StraightAngle, angle, LastCurveTime, Distance_Right, sensor_right, current_angle
     Speed = CurveSpeed
-    right(40)
+    ST.right(40)
     #lcd.setRGB(0, 0, 255)
     TargetDirection = StraightAngle + 90.0
-    angle = IMU_getAngle()
+    angle = GY.IMU_getAngle()
     StraightAngle = TargetDirection
-    runMotor(SlowSpeed)
+    DC.runMotor(SlowSpeed)
     # checks if the car has a greater angle than the target direction in order to correct it
     while angle < TargetDirection - correction_Right:
-        angle = IMU_getAngle()
+        angle = GY.IMU_getAngle()
         Speed = Speed + 5
         if Speed > CurveSpeed:
             Speed = CurveSpeed
-        runMotor(Speed)
+        DC.runMotor(Speed)
         delay(50)
     corners = corners + 1
     StraightAngle = TargetDirection
-    center()
-    runMotor(NormalSpeed)
-    Distance_Right = SpaceUltraSonicRight()
+    ST.center()
+    DC.runMotor(NormalSpeed)
+    Distance_Right = US.SpaceUltraSonicRight()
     # try to find the inside wall again
     while Distance_Right > 60:
-        Distance_Right = SpaceUltraSonicRight()
+        Distance_Right = US.SpaceUltraSonicRight()
         Gyro_steer_straight()
     #lcd.setRGB(0, 255, 0)
     LastCurveTime = millis()
@@ -321,9 +295,9 @@ def Curve_R():
 
 def measureAllCurrentDistances():
     global Distance_Front, Distance_Left, Distance_Right
-    Distance_Front = SpaceUltraSonicFront()
-    Distance_Left = SpaceUltraSonicLeft()
-    Distance_Right = SpaceUltraSonicRight() 
+    Distance_Front = US.SpaceUltraSonicFront()
+    Distance_Left = US.SpaceUltraSonicLeft()
+    Distance_Right = US.SpaceUltraSonicRight() 
 
 # waitOnButtonPress()
 # waits until the button is pressed
@@ -339,10 +313,10 @@ def waitOnButtonPress():
 def slowspeedToFindCorrectDirection():
     global DrivingDirection, Distance_Left, Distance_Right
     if DrivingDirection == 'U':
-        runMotor(SlowSpeed)
+        DC.runMotor(SlowSpeed)
         while (Distance_Left < 80.0) and (Distance_Right < 80.0):
-            Distance_Left = SpaceUltraSonicLeft()
-            Distance_Right = SpaceUltraSonicRight()
+            Distance_Left = US.SpaceUltraSonicLeft()
+            Distance_Right = US.SpaceUltraSonicRight()
             Gyro_steer_straight()
         if Distance_Left >= 80.0:
             DrivingDirection = 'L'
@@ -351,21 +325,21 @@ def slowspeedToFindCorrectDirection():
             DrivingDirection = 'R'
             Curve_R()
     elif DrivingDirection == 'R':
-        runMotor(SlowSpeed)
+        DC.runMotor(SlowSpeed)
         delay(100)
         StartNarrow_R()
-        Distance_Right = SpaceUltraSonicRight()
+        Distance_Right = US.SpaceUltraSonicRight()
         while Distance_Right < 80.0:
-            Distance_Right = SpaceUltraSonicRight()
+            Distance_Right = US.SpaceUltraSonicRight()
             Gyro_steer_straight()
         Curve_R()
     elif DrivingDirection == 'L':
-        runMotor(SlowSpeed)
+        DC.runMotor(SlowSpeed)
         delay(100)
         StartNarrow_L()
-        Distance_Left = SpaceUltraSonicLeft()
+        Distance_Left = US.SpaceUltraSonicLeft()
         while Distance_Left < 80.0:
-            Distance_Left = SpaceUltraSonicLeft()
+            Distance_Left = US.SpaceUltraSonicLeft()
             Gyro_steer_straight()
         Curve_L()
  
@@ -398,7 +372,7 @@ def operateNavigationThroughTurns():
     if DrivingDirection == 'R':
         while corners < 12:
             # clockwise running for right
-            Distance_Right = SpaceUltraSonicRight()
+            Distance_Right = US.SpaceUltraSonicRight()
             # check for Right Turn
             if (Distance_Right > 80) and (millis() - LastCurveTime >= NextCurveDelay):
                 Curve_R()
@@ -407,7 +381,7 @@ def operateNavigationThroughTurns():
     else:
         while corners < 12:
             # counterclockwise running for left
-            Distance_Left = SpaceUltraSonicLeft()
+            Distance_Left = US.SpaceUltraSonicLeft()
             # check for Left Turn
             if (Distance_Left > 80) and (millis() - LastCurveTime >= NextCurveDelay):
                 Curve_L()
@@ -424,10 +398,10 @@ if __name__ == "__main__":
         waitOnButtonPress()
         measureAllCurrentDistances()
         wallDirectionCheck()
-        StraightAngle = IMU_getAngle()
+        StraightAngle = GY.IMU_getAngle()
         
         #loop
         while True:
-        
-    
-    except 
+            ...
+    except Exception as e:
+        print(e)
